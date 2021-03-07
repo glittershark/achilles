@@ -1,0 +1,18 @@
+[package]
+name = "achilles"
+version = "0.1.0"
+authors = ["Griffin Smith <root@gws.fyi>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.38"
+clap = "3.0.0-beta.2"
+derive_more = "0.99.11"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm11-0"] }
+llvm-sys = "110.0.1"
+nom = "6.1.2"
+nom-trace = { git = "https://github.com/glittershark/nom-trace", branch = "nom-6" }
+pratt = "0.3.0"
+proptest = "1.0.0"
+test-strategy = "0.1.1"
+thiserror = "1.0.24"

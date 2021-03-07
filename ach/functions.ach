@@ -1,0 +1,3 @@
+fn id x = x
+fn plus x y = x + y
+fn main = plus (id 2) 7

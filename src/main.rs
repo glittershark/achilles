@@ -1,0 +1,31 @@
+use clap::Clap;
+
+pub mod ast;
+pub mod codegen;
+pub(crate) mod commands;
+pub(crate) mod common;
+pub mod compiler;
+pub mod interpreter;
+pub mod parser;
+
+pub use common::{Error, Result};
+
+#[derive(Clap)]
+struct Opts {
+    #[clap(subcommand)]
+    subcommand: Command,
+}
+
+#[derive(Clap)]
+enum Command {
+    Eval(commands::Eval),
+    Compile(commands::Compile),
+}
+
+fn main() -> anyhow::Result<()> {
+    let opts = Opts::parse();
+    match opts.subcommand {
+        Command::Eval(eval) => Ok(eval.run()?),
+        Command::Compile(compile) => Ok(compile.run()?),
+    }
+}
