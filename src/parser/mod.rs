@@ -156,6 +156,10 @@ where
     }
 }
 
+fn is_reserved(s: &str) -> bool {
+    matches!(s, "if" | "then" | "else" | "let" | "in" | "fn")
+}
+
 fn ident<'a, E>(i: &'a str) -> nom::IResult<&'a str, Ident, E>
 where
     E: ParseError<&'a str>,
@@ -170,7 +174,12 @@ where
                 }
                 idx += 1;
             }
-            Ok((&i[idx..], Ident::from_str_unchecked(&i[..idx])))
+            let id = &i[..idx];
+            if is_reserved(id) {
+                Err(nom::Err::Error(E::from_error_kind(i, ErrorKind::Satisfy)))
+            } else {
+                Ok((&i[idx..], Ident::from_str_unchecked(id)))
+            }
         } else {
             Err(nom::Err::Error(E::from_error_kind(i, ErrorKind::Satisfy)))
         }
@@ -228,14 +237,65 @@ named!(if_(&str) -> Expr, do_parse! (
 
 named!(ident_expr(&str) -> Expr, map!(ident, Expr::Ident));
 
+named!(paren_expr(&str) -> Expr,
+       delimited!(complete!(tag!("(")), expr, complete!(tag!(")"))));
+
+named!(funcref(&str) -> Expr, alt!(
+    ident_expr |
+    paren_expr
+));
+
+named!(no_arg_call(&str) -> Expr, do_parse!(
+    fun: funcref
+        >> multispace0
+        >> complete!(tag!("()"))
+        >> (Expr::Call {
+            fun: Box::new(fun),
+            args: vec![],
+        })
+));
+
+named!(fun_expr(&str) -> Expr, do_parse!(
+    tag!("fn")
+        >> multispace1
+        >> args: separated_list0!(multispace1, ident)
+        >> multispace0
+        >> char!('=')
+        >> multispace0
+        >> body: expr
+        >> (Expr::Fun(Box::new(Fun {
+            args,
+            body
+        })))
+));
+
+named!(arg(&str) -> Expr, alt!(
+    ident_expr |
+    literal |
+    paren_expr
+));
+
+named!(call_with_args(&str) -> Expr, do_parse!(
+    fun: funcref
+        >> multispace1
+        >> args: separated_list1!(multispace1, arg)
+        >> (Expr::Call {
+            fun: Box::new(fun),
+            args
+        })
+));
+
 named!(simple_expr(&str) -> Expr, alt!(
     let_ |
     if_ |
+    fun_expr |
     literal |
     ident_expr
 ));
 
 named!(pub expr(&str) -> Expr, alt!(
+    no_arg_call |
+    call_with_args |
     map!(token_tree, |tt| {
         ExprParser.parse(&mut tt.into_iter()).unwrap()
     }) |
@@ -243,8 +303,8 @@ named!(pub expr(&str) -> Expr, alt!(
 
 //////
 
-named!(fun(&str) -> Fun, do_parse!(
-    tag!("fn")
+named!(fun_decl(&str) -> Decl, do_parse!(
+    complete!(tag!("fn"))
         >> multispace0
         >> name: ident
         >> multispace1
@@ -253,21 +313,24 @@ named!(fun(&str) -> Fun, do_parse!(
         >> char!('=')
         >> multispace0
         >> body: expr
-        >> (Fun {
+        >> (Decl::Fun {
             name,
-            args,
-            body
+            body: Fun {
+                args,
+                body
+            }
         })
 ));
 
 named!(pub decl(&str) -> Decl, alt!(
-    fun => { |f| Decl::Fun(f) }
+    fun_decl
 ));
 
-named!(pub toplevel(&str) -> Vec<Decl>, separated_list0!(multispace1, decl));
+named!(pub toplevel(&str) -> Vec<Decl>, many0!(decl));
 
 #[cfg(test)]
 mod tests {
+    use nom_trace::print_trace;
     use std::convert::{TryFrom, TryInto};
 
     use super::*;
@@ -281,7 +344,9 @@ mod tests {
 
     macro_rules! test_parse {
         ($parser: ident, $src: expr) => {{
-            let (rem, res) = $parser($src).unwrap();
+            let res = $parser($src);
+            print_trace!();
+            let (rem, res) = res.unwrap();
             assert!(
                 rem.is_empty(),
                 "non-empty remainder: \"{}\", parsed: {:?}",
@@ -435,11 +500,87 @@ mod tests {
         let res = test_parse!(decl, "fn id x = x");
         assert_eq!(
             res,
-            Decl::Fun(Fun {
+            Decl::Fun {
                 name: "id".try_into().unwrap(),
-                args: vec!["x".try_into().unwrap()],
-                body: *ident_expr("x"),
-            })
+                body: Fun {
+                    args: vec!["x".try_into().unwrap()],
+                    body: *ident_expr("x"),
+                }
+            }
         )
+    }
+
+    #[test]
+    fn no_arg_call() {
+        let res = test_parse!(expr, "f()");
+        assert_eq!(
+            res,
+            Expr::Call {
+                fun: ident_expr("f"),
+                args: vec![]
+            }
+        );
+    }
+
+    #[test]
+    fn call_with_args() {
+        let res = test_parse!(expr, "f x 1");
+        assert_eq!(
+            res,
+            Expr::Call {
+                fun: ident_expr("f"),
+                args: vec![*ident_expr("x"), Expr::Literal(Literal::Int(1))]
+            }
+        )
+    }
+
+    #[test]
+    fn call_funcref() {
+        let res = test_parse!(expr, "(let x = 1 in x) 2");
+        assert_eq!(
+            res,
+            Expr::Call {
+                fun: Box::new(Expr::Let {
+                    bindings: vec![(
+                        Ident::try_from("x").unwrap(),
+                        Expr::Literal(Literal::Int(1))
+                    )],
+                    body: ident_expr("x")
+                }),
+                args: vec![Expr::Literal(Literal::Int(2))]
+            }
+        )
+    }
+
+    #[test]
+    fn anon_function() {
+        let res = test_parse!(expr, "let id = fn x = x in id 1");
+        assert_eq!(
+            res,
+            Expr::Let {
+                bindings: vec![(
+                    Ident::try_from("id").unwrap(),
+                    Expr::Fun(Box::new(Fun {
+                        args: vec![Ident::try_from("x").unwrap()],
+                        body: *ident_expr("x")
+                    }))
+                )],
+                body: Box::new(Expr::Call {
+                    fun: ident_expr("id"),
+                    args: vec![Expr::Literal(Literal::Int(1))],
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn multiple_decls() {
+        let res = test_parse!(
+            toplevel,
+            "fn id x = x
+             fn plus x y = x + y
+             fn main = plus (id 2) 7"
+        );
+        assert_eq!(res.len(), 3);
     }
 }

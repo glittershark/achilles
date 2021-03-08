@@ -5,10 +5,13 @@ use clap::Clap;
 use crate::common::Result;
 use crate::compiler::{self, CompilerOptions};
 
+/// Compile a source file
 #[derive(Clap)]
 pub struct Compile {
+    /// File to compile
     file: PathBuf,
 
+    /// Output file
     #[clap(short = 'o')]
     out_file: PathBuf,
 

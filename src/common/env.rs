@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::mem;
 
 use crate::ast::Ident;
 
@@ -23,6 +24,14 @@ impl<'ast, V> Env<'ast, V> {
 
     pub fn pop(&mut self) {
         self.0.pop();
+    }
+
+    pub fn save(&mut self) -> Self {
+        mem::take(self)
+    }
+
+    pub fn restore(&mut self, saved: Self) {
+        *self = saved;
     }
 
     pub fn set(&mut self, k: &'ast Ident<'ast>, v: V) {

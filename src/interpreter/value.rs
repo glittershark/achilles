@@ -6,108 +6,153 @@ use std::rc::Rc;
 use derive_more::{Deref, From, TryInto};
 
 use super::{Error, Result};
-use crate::ast::Type;
+use crate::ast::{Expr, FunctionType, Ident, Type};
 
-#[derive(Debug, PartialEq, From, TryInto)]
+#[derive(Debug, Clone)]
+pub struct Function<'a> {
+    pub type_: FunctionType,
+    pub args: Vec<Ident<'a>>,
+    pub body: Expr<'a>,
+}
+
+#[derive(From, TryInto)]
 #[try_into(owned, ref)]
-pub enum Val {
+pub enum Val<'a> {
     Int(i64),
     Float(f64),
     Bool(bool),
+    Function(Function<'a>),
 }
 
-impl From<u64> for Val {
+impl<'a> fmt::Debug for Val<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Val::Int(x) => f.debug_tuple("Int").field(x).finish(),
+            Val::Float(x) => f.debug_tuple("Float").field(x).finish(),
+            Val::Bool(x) => f.debug_tuple("Bool").field(x).finish(),
+            Val::Function(Function { type_, .. }) => {
+                f.debug_struct("Function").field("type_", type_).finish()
+            }
+        }
+    }
+}
+
+impl<'a> PartialEq for Val<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Val::Int(x), Val::Int(y)) => x == y,
+            (Val::Float(x), Val::Float(y)) => x == y,
+            (Val::Bool(x), Val::Bool(y)) => x == y,
+            (Val::Function(_), Val::Function(_)) => false,
+            (_, _) => false,
+        }
+    }
+}
+
+impl<'a> From<u64> for Val<'a> {
     fn from(i: u64) -> Self {
         Self::from(i as i64)
     }
 }
 
-impl Display for Val {
+impl<'a> Display for Val<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Val::Int(x) => x.fmt(f),
             Val::Float(x) => x.fmt(f),
             Val::Bool(x) => x.fmt(f),
+            Val::Function(Function { type_, .. }) => write!(f, "<{}>", type_),
         }
     }
 }
 
-impl Val {
+impl<'a> Val<'a> {
     pub fn type_(&self) -> Type {
         match self {
             Val::Int(_) => Type::Int,
             Val::Float(_) => Type::Float,
             Val::Bool(_) => Type::Bool,
+            Val::Function(Function { type_, .. }) => Type::Function(type_.clone()),
         }
     }
 
-    pub fn into_type<'a, T>(&'a self) -> Result<&'a T>
+    pub fn as_type<'b, T>(&'b self) -> Result<&'b T>
     where
-        T: TypeOf + 'a + Clone,
-        &'a T: TryFrom<&'a Self>,
+        T: TypeOf + 'b + Clone,
+        &'b T: TryFrom<&'b Self>,
     {
         <&T>::try_from(self).map_err(|_| Error::InvalidType {
             actual: self.type_(),
             expected: <T as TypeOf>::type_of(),
         })
     }
+
+    pub fn as_function<'b>(&'b self, function_type: FunctionType) -> Result<&'b Function<'a>> {
+        match self {
+            Val::Function(f) if f.type_ == function_type => Ok(&f),
+            _ => Err(Error::InvalidType {
+                actual: self.type_(),
+                expected: Type::Function(function_type),
+            }),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Deref)]
-pub struct Value(Rc<Val>);
+pub struct Value<'a>(Rc<Val<'a>>);
 
-impl Display for Value {
+impl<'a> Display for Value<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl<T> From<T> for Value
+impl<'a, T> From<T> for Value<'a>
 where
-    Val: From<T>,
+    Val<'a>: From<T>,
 {
     fn from(x: T) -> Self {
         Self(Rc::new(x.into()))
     }
 }
 
-impl Neg for Value {
-    type Output = Result<Value>;
+impl<'a> Neg for Value<'a> {
+    type Output = Result<Value<'a>>;
 
     fn neg(self) -> Self::Output {
-        Ok((-self.into_type::<i64>()?).into())
+        Ok((-self.as_type::<i64>()?).into())
     }
 }
 
-impl Add for Value {
-    type Output = Result<Value>;
+impl<'a> Add for Value<'a> {
+    type Output = Result<Value<'a>>;
 
     fn add(self, rhs: Self) -> Self::Output {
-        Ok((self.into_type::<i64>()? + rhs.into_type::<i64>()?).into())
+        Ok((self.as_type::<i64>()? + rhs.as_type::<i64>()?).into())
     }
 }
 
-impl Sub for Value {
-    type Output = Result<Value>;
+impl<'a> Sub for Value<'a> {
+    type Output = Result<Value<'a>>;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        Ok((self.into_type::<i64>()? - rhs.into_type::<i64>()?).into())
+        Ok((self.as_type::<i64>()? - rhs.as_type::<i64>()?).into())
     }
 }
 
-impl Mul for Value {
-    type Output = Result<Value>;
+impl<'a> Mul for Value<'a> {
+    type Output = Result<Value<'a>>;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        Ok((self.into_type::<i64>()? * rhs.into_type::<i64>()?).into())
+        Ok((self.as_type::<i64>()? * rhs.as_type::<i64>()?).into())
     }
 }
 
-impl Div for Value {
-    type Output = Result<Value>;
+impl<'a> Div for Value<'a> {
+    type Output = Result<Value<'a>>;
 
     fn div(self, rhs: Self) -> Self::Output {
-        Ok((self.into_type::<f64>()? / rhs.into_type::<f64>()?).into())
+        Ok((self.as_type::<f64>()? / rhs.as_type::<f64>()?).into())
     }
 }
 

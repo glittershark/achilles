@@ -14,9 +14,7 @@ pub fn jit_eval<T>(expr: &Expr) -> Result<T> {
         .module
         .create_jit_execution_engine(OptimizationLevel::None)
         .map_err(Error::from)?;
-    codegen.new_function("eval", context.i64_type().fn_type(&[], false));
-    let res = codegen.codegen_expr(&expr)?;
-    codegen.finish_function(&res);
+    codegen.codegen_function("test", &[], &expr)?;
 
     unsafe {
         let fun: JitFunction<unsafe extern "C" fn() -> T> =

@@ -2,13 +2,13 @@ mod error;
 mod value;
 
 pub use self::error::{Error, Result};
-pub use self::value::Value;
-use crate::ast::{BinaryOperator, Expr, Ident, Literal, UnaryOperator};
+pub use self::value::{Function, Value};
+use crate::ast::{BinaryOperator, Expr, FunctionType, Ident, Literal, Type, UnaryOperator};
 use crate::common::env::Env;
 
 #[derive(Debug, Default)]
 pub struct Interpreter<'a> {
-    env: Env<'a, Value>,
+    env: Env<'a, Value<'a>>,
 }
 
 impl<'a> Interpreter<'a> {
@@ -16,14 +16,14 @@ impl<'a> Interpreter<'a> {
         Self::default()
     }
 
-    fn resolve(&self, var: &'a Ident<'a>) -> Result<Value> {
+    fn resolve(&self, var: &'a Ident<'a>) -> Result<Value<'a>> {
         self.env
             .resolve(var)
             .cloned()
             .ok_or_else(|| Error::UndefinedVariable(var.to_owned()))
     }
 
-    pub fn eval(&mut self, expr: &'a Expr<'a>) -> Result<Value> {
+    pub fn eval(&mut self, expr: &'a Expr<'a>) -> Result<Value<'a>> {
         match expr {
             Expr::Ident(id) => self.resolve(id),
             Expr::Literal(Literal::Int(i)) => Ok((*i).into()),
@@ -63,12 +63,44 @@ impl<'a> Interpreter<'a> {
                 else_,
             } => {
                 let condition = self.eval(condition)?;
-                if *(condition.into_type::<bool>()?) {
+                if *(condition.as_type::<bool>()?) {
                     self.eval(then)
                 } else {
                     self.eval(else_)
                 }
             }
+            Expr::Call { ref fun, args } => {
+                let fun = self.eval(fun)?;
+                let expected_type = FunctionType {
+                    args: args.iter().map(|_| Type::Int).collect(),
+                    ret: Box::new(Type::Int),
+                };
+
+                let Function {
+                    args: function_args,
+                    body,
+                    ..
+                } = fun.as_function(expected_type)?;
+                let arg_values = function_args.iter().zip(
+                    args.iter()
+                        .map(|v| self.eval(v))
+                        .collect::<Result<Vec<_>>>()?,
+                );
+                let mut interpreter = Interpreter::new();
+                for (arg_name, arg_value) in arg_values {
+                    interpreter.env.set(arg_name, arg_value);
+                }
+                Ok(Value::from(*interpreter.eval(body)?.as_type::<i64>()?))
+            }
+            Expr::Fun(fun) => Ok(Value::from(value::Function {
+                // TODO
+                type_: FunctionType {
+                    args: fun.args.iter().map(|_| Type::Int).collect(),
+                    ret: Box::new(Type::Int),
+                },
+                args: fun.args.iter().map(|arg| arg.to_owned()).collect(),
+                body: fun.body.to_owned(),
+            })),
         }
     }
 }
@@ -92,12 +124,12 @@ mod tests {
 
     fn parse_eval<T>(src: &str) -> T
     where
-        for<'a> &'a T: TryFrom<&'a Val>,
+        for<'a> &'a T: TryFrom<&'a Val<'a>>,
         T: Clone + TypeOf,
     {
         let expr = crate::parser::expr(src).unwrap().1;
         let res = eval(&expr).unwrap();
-        res.into_type::<T>().unwrap().clone()
+        res.as_type::<T>().unwrap().clone()
     }
 
     #[test]
@@ -108,7 +140,7 @@ mod tests {
             rhs: int_lit(2),
         };
         let res = eval(&expr).unwrap();
-        assert_eq!(*res.into_type::<i64>().unwrap(), 2);
+        assert_eq!(*res.as_type::<i64>().unwrap(), 2);
     }
 
     #[test]
@@ -121,5 +153,11 @@ mod tests {
     fn conditional_with_equals() {
         let res = parse_eval::<i64>("let x = 1 in if x == 1 then 2 else 4");
         assert_eq!(res, 2);
+    }
+
+    #[test]
+    fn function_call() {
+        let res = parse_eval::<i64>("let id = fn x = x in id 1");
+        assert_eq!(res, 1);
     }
 }
