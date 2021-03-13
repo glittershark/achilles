@@ -12,7 +12,7 @@ use inkwell::values::{AnyValueEnum, BasicValueEnum, FunctionValue};
 use inkwell::IntPredicate;
 use thiserror::Error;
 
-use crate::ast::{BinaryOperator, Decl, Expr, Fun, Ident, Literal, UnaryOperator};
+use crate::ast::{BinaryOperator, Binding, Decl, Expr, Fun, Ident, Literal, UnaryOperator};
 use crate::common::env::Env;
 
 #[derive(Debug, PartialEq, Eq, Error)]
@@ -137,9 +137,9 @@ impl<'ctx, 'ast> Codegen<'ctx, 'ast> {
             }
             Expr::Let { bindings, body } => {
                 self.env.push();
-                for (id, val) in bindings {
-                    let val = self.codegen_expr(val)?;
-                    self.env.set(id, val);
+                for Binding { ident, body, .. } in bindings {
+                    let val = self.codegen_expr(body)?;
+                    self.env.set(ident, val);
                 }
                 let res = self.codegen_expr(body);
                 self.env.pop();
@@ -207,6 +207,7 @@ impl<'ctx, 'ast> Codegen<'ctx, 'ast> {
                 self.env.restore(env);
                 Ok(function.into())
             }
+            Expr::Ascription { expr, .. } => self.codegen_expr(expr),
         }
     }
 

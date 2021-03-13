@@ -5,9 +5,11 @@ use nom::{alt, char, complete, do_parse, many0, named, separated_list0, tag};
 #[macro_use]
 mod macros;
 mod expr;
+mod type_;
 
 use crate::ast::{Decl, Fun, Ident};
 pub use expr::expr;
+pub use type_::type_;
 
 pub type Error = nom::Err<nom::error::Error<String>>;
 

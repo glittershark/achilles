@@ -110,6 +110,23 @@ pub enum Literal {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Binding<'a> {
+    pub ident: Ident<'a>,
+    pub type_: Option<Type>,
+    pub body: Expr<'a>,
+}
+
+impl<'a> Binding<'a> {
+    fn to_owned(&self) -> Binding<'static> {
+        Binding {
+            ident: self.ident.to_owned(),
+            type_: self.type_.clone(),
+            body: self.body.to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Expr<'a> {
     Ident(Ident<'a>),
 
@@ -127,7 +144,7 @@ pub enum Expr<'a> {
     },
 
     Let {
-        bindings: Vec<(Ident<'a>, Expr<'a>)>,
+        bindings: Vec<Binding<'a>>,
         body: Box<Expr<'a>>,
     },
 
@@ -142,6 +159,11 @@ pub enum Expr<'a> {
     Call {
         fun: Box<Expr<'a>>,
         args: Vec<Expr<'a>>,
+    },
+
+    Ascription {
+        expr: Box<Expr<'a>>,
+        type_: Type,
     },
 }
 
@@ -160,10 +182,7 @@ impl<'a> Expr<'a> {
                 rhs: Box::new((**rhs).to_owned()),
             },
             Expr::Let { bindings, body } => Expr::Let {
-                bindings: bindings
-                    .iter()
-                    .map(|(id, expr)| (id.to_owned(), expr.to_owned()))
-                    .collect(),
+                bindings: bindings.iter().map(|binding| binding.to_owned()).collect(),
                 body: Box::new((**body).to_owned()),
             },
             Expr::If {
@@ -179,6 +198,10 @@ impl<'a> Expr<'a> {
             Expr::Call { fun, args } => Expr::Call {
                 fun: Box::new((**fun).to_owned()),
                 args: args.iter().map(|arg| arg.to_owned()).collect(),
+            },
+            Expr::Ascription { expr, type_ } => Expr::Ascription {
+                expr: Box::new((**expr).to_owned()),
+                type_: type_.clone(),
             },
         }
     }

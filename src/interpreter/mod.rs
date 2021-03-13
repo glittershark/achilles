@@ -3,7 +3,9 @@ mod value;
 
 pub use self::error::{Error, Result};
 pub use self::value::{Function, Value};
-use crate::ast::{BinaryOperator, Expr, FunctionType, Ident, Literal, Type, UnaryOperator};
+use crate::ast::{
+    BinaryOperator, Binding, Expr, FunctionType, Ident, Literal, Type, UnaryOperator,
+};
 use crate::common::env::Env;
 
 #[derive(Debug, Default)]
@@ -49,9 +51,9 @@ impl<'a> Interpreter<'a> {
             }
             Expr::Let { bindings, body } => {
                 self.env.push();
-                for (id, val) in bindings {
-                    let val = self.eval(val)?;
-                    self.env.set(id, val);
+                for Binding { ident, body, .. } in bindings {
+                    let val = self.eval(body)?;
+                    self.env.set(ident, val);
                 }
                 let res = self.eval(body)?;
                 self.env.pop();
@@ -101,6 +103,7 @@ impl<'a> Interpreter<'a> {
                 args: fun.args.iter().map(|arg| arg.to_owned()).collect(),
                 body: fun.body.to_owned(),
             })),
+            Expr::Ascription { expr, .. } => self.eval(expr),
         }
     }
 }

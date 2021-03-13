@@ -1,12 +1,12 @@
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::{
-    alt, char, complete, delimited, do_parse, flat_map, many0, map, named, parse_to,
-    separated_list0, separated_list1, tag, tuple,
+    alt, call, char, complete, delimited, do_parse, flat_map, many0, map, named, opt, parse_to,
+    preceded, separated_list0, separated_list1, tag, tuple,
 };
 use pratt::{Affix, Associativity, PrattParser, Precedence};
 
-use crate::ast::{BinaryOperator, Expr, Fun, Ident, Literal, UnaryOperator};
-use crate::parser::ident;
+use crate::ast::{BinaryOperator, Binding, Expr, Fun, Ident, Literal, UnaryOperator};
+use crate::parser::{ident, type_};
 
 #[derive(Debug)]
 enum TokenTree<'a> {
@@ -158,14 +158,20 @@ named!(int(&str) -> Literal, map!(flat_map!(digit1, parse_to!(u64)), Literal::In
 
 named!(literal(&str) -> Expr, map!(alt!(int), Expr::Literal));
 
-named!(binding(&str) -> (Ident, Expr), do_parse!(
+named!(binding(&str) -> Binding, do_parse!(
     multispace0
         >> ident: ident
         >> multispace0
+        >> type_: opt!(preceded!(tuple!(tag!(":"), multispace0), type_))
+        >> multispace0
         >> char!('=')
         >> multispace0
-        >> expr: expr
-        >> (ident, expr)
+        >> body: expr
+        >> (Binding {
+            ident,
+            type_,
+            body
+        })
 ));
 
 named!(let_(&str) -> Expr, do_parse!(
@@ -202,6 +208,25 @@ named!(if_(&str) -> Expr, do_parse! (
 ));
 
 named!(ident_expr(&str) -> Expr, map!(ident, Expr::Ident));
+
+fn ascripted<'a>(
+    p: impl Fn(&'a str) -> nom::IResult<&'a str, Expr, nom::error::Error<&'a str>> + 'a,
+) -> impl Fn(&'a str) -> nom::IResult<&str, Expr, nom::error::Error<&'a str>> {
+    move |i| {
+        do_parse!(
+            i,
+            expr: p
+                >> multispace0
+                >> complete!(tag!(":"))
+                >> multispace0
+                >> type_: type_
+                >> (Expr::Ascription {
+                    expr: Box::new(expr),
+                    type_
+                })
+        )
+    }
+}
 
 named!(paren_expr(&str) -> Expr,
        delimited!(complete!(tag!("(")), expr, complete!(tag!(")"))));
@@ -251,12 +276,17 @@ named!(call_with_args(&str) -> Expr, do_parse!(
         })
 ));
 
-named!(simple_expr(&str) -> Expr, alt!(
+named!(simple_expr_unascripted(&str) -> Expr, alt!(
     let_ |
     if_ |
     fun_expr |
     literal |
     ident_expr
+));
+
+named!(simple_expr(&str) -> Expr, alt!(
+    call!(ascripted(simple_expr_unascripted)) |
+    simple_expr_unascripted
 ));
 
 named!(pub expr(&str) -> Expr, alt!(
@@ -265,11 +295,13 @@ named!(pub expr(&str) -> Expr, alt!(
     map!(token_tree, |tt| {
         ExprParser.parse(&mut tt.into_iter()).unwrap()
     }) |
-    simple_expr));
+    simple_expr
+));
 
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::ast::Type;
     use std::convert::TryFrom;
     use BinaryOperator::*;
     use Expr::{BinaryOp, If, Let, UnaryOp};
@@ -374,18 +406,20 @@ pub(crate) mod tests {
             res,
             Let {
                 bindings: vec![
-                    (
-                        Ident::try_from("x").unwrap(),
-                        Expr::Literal(Literal::Int(1))
-                    ),
-                    (
-                        Ident::try_from("y").unwrap(),
-                        Expr::BinaryOp {
+                    Binding {
+                        ident: Ident::try_from("x").unwrap(),
+                        type_: None,
+                        body: Expr::Literal(Literal::Int(1))
+                    },
+                    Binding {
+                        ident: Ident::try_from("y").unwrap(),
+                        type_: None,
+                        body: Expr::BinaryOp {
                             lhs: ident_expr("x"),
                             op: Mul,
                             rhs: Box::new(Expr::Literal(Literal::Int(7)))
                         }
-                    )
+                    }
                 ],
                 body: Box::new(Expr::BinaryOp {
                     lhs: Box::new(Expr::BinaryOp {
@@ -448,10 +482,11 @@ pub(crate) mod tests {
             res,
             Expr::Call {
                 fun: Box::new(Expr::Let {
-                    bindings: vec![(
-                        Ident::try_from("x").unwrap(),
-                        Expr::Literal(Literal::Int(1))
-                    )],
+                    bindings: vec![Binding {
+                        ident: Ident::try_from("x").unwrap(),
+                        type_: None,
+                        body: Expr::Literal(Literal::Int(1))
+                    }],
                     body: ident_expr("x")
                 }),
                 args: vec![Expr::Literal(Literal::Int(2))]
@@ -465,18 +500,76 @@ pub(crate) mod tests {
         assert_eq!(
             res,
             Expr::Let {
-                bindings: vec![(
-                    Ident::try_from("id").unwrap(),
-                    Expr::Fun(Box::new(Fun {
+                bindings: vec![Binding {
+                    ident: Ident::try_from("id").unwrap(),
+                    type_: None,
+                    body: Expr::Fun(Box::new(Fun {
                         args: vec![Ident::try_from("x").unwrap()],
                         body: *ident_expr("x")
                     }))
-                )],
+                }],
                 body: Box::new(Expr::Call {
                     fun: ident_expr("id"),
                     args: vec![Expr::Literal(Literal::Int(1))],
                 })
             }
         );
+    }
+
+    mod ascriptions {
+        use super::*;
+
+        #[test]
+        fn bare_ascription() {
+            let res = test_parse!(expr, "1: float");
+            assert_eq!(
+                res,
+                Expr::Ascription {
+                    expr: Box::new(Expr::Literal(Literal::Int(1))),
+                    type_: Type::Float
+                }
+            )
+        }
+
+        #[test]
+        fn fn_body_ascription() {
+            let res = test_parse!(expr, "let const_1 = fn x = 1: int in const_1 2");
+            assert_eq!(
+                res,
+                Expr::Let {
+                    bindings: vec![Binding {
+                        ident: Ident::try_from("const_1").unwrap(),
+                        type_: None,
+                        body: Expr::Fun(Box::new(Fun {
+                            args: vec![Ident::try_from("x").unwrap()],
+                            body: Expr::Ascription {
+                                expr: Box::new(Expr::Literal(Literal::Int(1))),
+                                type_: Type::Int,
+                            }
+                        }))
+                    }],
+                    body: Box::new(Expr::Call {
+                        fun: ident_expr("const_1"),
+                        args: vec![Expr::Literal(Literal::Int(2))]
+                    })
+                }
+            )
+        }
+
+        #[test]
+        fn let_binding_ascripted() {
+            let res = test_parse!(expr, "let x: int = 1 in x");
+            assert_eq!(
+                res,
+                Expr::Let {
+                    bindings: vec![Binding {
+                        ident: Ident::try_from("x").unwrap(),
+                        type_: Some(Type::Int),
+                        body: Expr::Literal(Literal::Int(1))
+                    }],
+                    body: ident_expr("x")
+                }
+            )
+        }
     }
 }
