@@ -6,6 +6,7 @@ pub(crate) mod commands;
 pub(crate) mod common;
 pub mod compiler;
 pub mod interpreter;
+#[macro_use]
 pub mod parser;
 
 pub use common::{Error, Result};
