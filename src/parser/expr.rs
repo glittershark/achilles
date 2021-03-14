@@ -9,7 +9,7 @@ use nom::{
 use pratt::{Affix, Associativity, PrattParser, Precedence};
 
 use crate::ast::{BinaryOperator, Binding, Expr, Fun, Literal, UnaryOperator};
-use crate::parser::{ident, type_};
+use crate::parser::{arg, ident, type_};
 
 #[derive(Debug)]
 enum TokenTree<'a> {
@@ -274,7 +274,7 @@ named!(no_arg_call(&str) -> Expr, do_parse!(
 named!(fun_expr(&str) -> Expr, do_parse!(
     tag!("fn")
         >> multispace1
-        >> args: separated_list0!(multispace1, ident)
+        >> args: separated_list0!(multispace1, arg)
         >> multispace0
         >> char!('=')
         >> multispace0
@@ -285,7 +285,7 @@ named!(fun_expr(&str) -> Expr, do_parse!(
         })))
 ));
 
-named!(arg(&str) -> Expr, alt!(
+named!(fn_arg(&str) -> Expr, alt!(
     ident_expr |
     literal_expr |
     paren_expr
@@ -294,7 +294,7 @@ named!(arg(&str) -> Expr, alt!(
 named!(call_with_args(&str) -> Expr, do_parse!(
     fun: funcref
         >> multispace1
-        >> args: separated_list1!(multispace1, arg)
+        >> args: separated_list1!(multispace1, fn_arg)
         >> (Expr::Call {
             fun: Box::new(fun),
             args
@@ -326,7 +326,7 @@ named!(pub expr(&str) -> Expr, alt!(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::ast::{Ident, Type};
+    use crate::ast::{Arg, Ident, Type};
     use std::convert::TryFrom;
     use BinaryOperator::*;
     use Expr::{BinaryOp, If, Let, UnaryOp};
@@ -549,7 +549,7 @@ pub(crate) mod tests {
                     ident: Ident::try_from("id").unwrap(),
                     type_: None,
                     body: Expr::Fun(Box::new(Fun {
-                        args: vec![Ident::try_from("x").unwrap()],
+                        args: vec![Arg::try_from("x").unwrap()],
                         body: *ident_expr("x")
                     }))
                 }],
@@ -586,7 +586,7 @@ pub(crate) mod tests {
                         ident: Ident::try_from("const_1").unwrap(),
                         type_: None,
                         body: Expr::Fun(Box::new(Fun {
-                            args: vec![Ident::try_from("x").unwrap()],
+                            args: vec![Arg::try_from("x").unwrap()],
                             body: Expr::Ascription {
                                 expr: Box::new(Expr::Literal(Literal::Int(1))),
                                 type_: Type::Int,

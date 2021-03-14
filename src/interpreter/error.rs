@@ -10,7 +10,10 @@ pub enum Error {
     UndefinedVariable(Ident<'static>),
 
     #[error("Unexpected type {actual}, expected type {expected}")]
-    InvalidType { actual: Type, expected: Type },
+    InvalidType {
+        actual: Type<'static>,
+        expected: Type<'static>,
+    },
 }
 
 pub type Result<T> = result::Result<T, Error>;

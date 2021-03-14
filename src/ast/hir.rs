@@ -222,6 +222,12 @@ pub enum Decl<'a, T> {
 }
 
 impl<'a, T> Decl<'a, T> {
+    pub fn type_(&self) -> &T {
+        match self {
+            Decl::Fun { type_, .. } => type_,
+        }
+    }
+
     pub fn traverse_type<F, U, E>(self, f: F) -> Result<Decl<'a, U>, E>
     where
         F: Fn(T) -> Result<U, E> + Clone,

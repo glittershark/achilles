@@ -15,13 +15,13 @@ pub struct Check {
     expr: Option<String>,
 }
 
-fn run_expr(expr: String) -> Result<Type> {
+fn run_expr(expr: String) -> Result<Type<'static>> {
     let (_, parsed) = parser::expr(&expr)?;
     let hir_expr = tc::typecheck_expr(parsed)?;
-    Ok(hir_expr.type_().clone())
+    Ok(hir_expr.type_().to_owned())
 }
 
-fn run_path(path: PathBuf) -> Result<Type> {
+fn run_path(path: PathBuf) -> Result<Type<'static>> {
     todo!()
 }
 

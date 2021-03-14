@@ -7,7 +7,7 @@ mod macros;
 mod expr;
 mod type_;
 
-use crate::ast::{Decl, Fun, Ident};
+use crate::ast::{Arg, Decl, Fun, Ident};
 pub use expr::expr;
 pub use type_::type_;
 
@@ -58,12 +58,33 @@ where
     }
 }
 
+named!(ascripted_arg(&str) -> Arg, do_parse!(
+    complete!(char!('(')) >>
+        multispace0 >>
+        ident: ident >>
+        multispace0 >>
+        complete!(char!(':')) >>
+        multispace0 >>
+        type_: type_ >>
+        multispace0 >>
+        complete!(char!(')')) >>
+        (Arg {
+            ident,
+            type_: Some(type_)
+        })
+));
+
+named!(arg(&str) -> Arg, alt!(
+    ident => { |ident| Arg {ident, type_: None}} |
+    ascripted_arg
+));
+
 named!(fun_decl(&str) -> Decl, do_parse!(
     complete!(tag!("fn"))
         >> multispace0
         >> name: ident
         >> multispace1
-        >> args: separated_list0!(multispace1, ident)
+        >> args: separated_list0!(multispace1, arg)
         >> multispace0
         >> char!('=')
         >> multispace0
@@ -87,6 +108,8 @@ named!(pub toplevel(&str) -> Vec<Decl>, terminated!(many0!(decl), multispace0));
 mod tests {
     use std::convert::TryInto;
 
+    use crate::ast::{BinaryOperator, Expr, Literal, Type};
+
     use super::*;
     use expr::tests::ident_expr;
 
@@ -103,6 +126,29 @@ mod tests {
                 }
             }
         )
+    }
+
+    #[test]
+    fn ascripted_fn_args() {
+        test_parse!(ascripted_arg, "(x : int)");
+        let res = test_parse!(decl, "fn plus1 (x : int) = x + 1");
+        assert_eq!(
+            res,
+            Decl::Fun {
+                name: "plus1".try_into().unwrap(),
+                body: Fun {
+                    args: vec![Arg {
+                        ident: "x".try_into().unwrap(),
+                        type_: Some(Type::Int),
+                    }],
+                    body: Expr::BinaryOp {
+                        lhs: ident_expr("x"),
+                        op: BinaryOperator::Add,
+                        rhs: Box::new(Expr::Literal(Literal::Int(1))),
+                    }
+                }
+            }
+        );
     }
 
     #[test]

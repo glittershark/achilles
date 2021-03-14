@@ -1,6 +1,7 @@
 use nom::character::complete::{multispace0, multispace1};
 use nom::{alt, delimited, do_parse, map, named, opt, separated_list0, tag, terminated, tuple};
 
+use super::ident;
 use crate::ast::{FunctionType, Type};
 
 named!(function_type(&str) -> Type, do_parse!(
@@ -29,6 +30,7 @@ named!(pub type_(&str) -> Type, alt!(
     tag!("bool") => { |_| Type::Bool } |
     tag!("cstring") => { |_| Type::CString } |
     function_type |
+    ident => { |id| Type::Var(id) } |
     delimited!(
         tuple!(tag!("("), multispace0),
         type_,
@@ -38,7 +40,10 @@ named!(pub type_(&str) -> Type, alt!(
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use super::*;
+    use crate::ast::Ident;
 
     #[test]
     fn simple_types() {
@@ -100,6 +105,20 @@ mod tests {
                     Type::Float
                 ],
                 ret: Box::new(Type::Float)
+            })
+        )
+    }
+
+    #[test]
+    fn type_vars() {
+        assert_eq!(
+            test_parse!(type_, "fn x, y -> x"),
+            Type::Function(FunctionType {
+                args: vec![
+                    Type::Var(Ident::try_from("x").unwrap()),
+                    Type::Var(Ident::try_from("y").unwrap()),
+                ],
+                ret: Box::new(Type::Var(Ident::try_from("x").unwrap())),
             })
         )
     }

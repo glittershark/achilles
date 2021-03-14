@@ -13,9 +13,9 @@ use crate::ast::{FunctionType, Ident, Type};
 
 #[derive(Debug, Clone)]
 pub struct Function<'a> {
-    pub type_: FunctionType,
+    pub type_: FunctionType<'a>,
     pub args: Vec<Ident<'a>>,
-    pub body: Expr<'a, Type>,
+    pub body: Expr<'a, Type<'a>>,
 }
 
 #[derive(From, TryInto)]
@@ -100,7 +100,7 @@ impl<'a> Val<'a> {
         &'b T: TryFrom<&'b Self>,
     {
         <&T>::try_from(self).map_err(|_| Error::InvalidType {
-            actual: self.type_(),
+            actual: self.type_().to_owned(),
             expected: <T as TypeOf>::type_of(),
         })
     }
@@ -109,8 +109,8 @@ impl<'a> Val<'a> {
         match self {
             Val::Function(f) if f.type_ == function_type => Ok(&f),
             _ => Err(Error::InvalidType {
-                actual: self.type_(),
-                expected: Type::Function(function_type),
+                actual: self.type_().to_owned(),
+                expected: Type::Function(function_type.to_owned()),
             }),
         }
     }
@@ -175,29 +175,29 @@ impl<'a> Div for Value<'a> {
 }
 
 pub trait TypeOf {
-    fn type_of() -> Type;
+    fn type_of() -> Type<'static>;
 }
 
 impl TypeOf for i64 {
-    fn type_of() -> Type {
+    fn type_of() -> Type<'static> {
         Type::Int
     }
 }
 
 impl TypeOf for bool {
-    fn type_of() -> Type {
+    fn type_of() -> Type<'static> {
         Type::Bool
     }
 }
 
 impl TypeOf for f64 {
-    fn type_of() -> Type {
+    fn type_of() -> Type<'static> {
         Type::Float
     }
 }
 
 impl TypeOf for String {
-    fn type_of() -> Type {
+    fn type_of() -> Type<'static> {
         Type::CString
     }
 }
