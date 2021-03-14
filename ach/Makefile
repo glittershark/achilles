@@ -12,4 +12,4 @@ default: simple
 .PHONY: clean
 
 clean:
-	@rm -f *.ll *.o simple
+	@rm -f *.ll *.o simple functions

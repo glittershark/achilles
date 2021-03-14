@@ -98,7 +98,20 @@ named!(fun_decl(&str) -> Decl, do_parse!(
         })
 ));
 
+named!(ascription_decl(&str) -> Decl, do_parse!(
+    name: ident
+        >> multispace0
+        >> complete!(char!(':'))
+        >> multispace0
+        >> type_: type_
+        >> (Decl::Ascription {
+            name,
+            type_
+        })
+));
+
 named!(pub decl(&str) -> Decl, alt!(
+    ascription_decl |
     fun_decl
 ));
 
@@ -108,7 +121,7 @@ named!(pub toplevel(&str) -> Vec<Decl>, terminated!(many0!(decl), multispace0));
 mod tests {
     use std::convert::TryInto;
 
-    use crate::ast::{BinaryOperator, Expr, Literal, Type};
+    use crate::ast::{BinaryOperator, Expr, FunctionType, Literal, Type};
 
     use super::*;
     use expr::tests::ident_expr;
@@ -165,5 +178,20 @@ mod tests {
             "fn id x = x\nfn plus x y = x + y\nfn main = plus (id 2) 7\n"
         );
         assert_eq!(res.len(), 3);
+    }
+
+    #[test]
+    fn top_level_ascription() {
+        let res = test_parse!(toplevel, "id : fn a -> a");
+        assert_eq!(
+            res,
+            vec![Decl::Ascription {
+                name: "id".try_into().unwrap(),
+                type_: Type::Function(FunctionType {
+                    args: vec![Type::Var("a".try_into().unwrap())],
+                    ret: Box::new(Type::Var("a".try_into().unwrap()))
+                })
+            }]
+        )
     }
 }

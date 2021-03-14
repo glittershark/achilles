@@ -8,6 +8,19 @@ const FIXTURES: &[(&str, i32)] = &[("simple", 5), ("functions", 9)];
 fn compile_and_run_files() {
     let ach = root().unwrap().join("ach");
 
+    println!("Running: `make clean`");
+    assert!(
+        Command::new("make")
+            .arg("clean")
+            .current_dir(&ach)
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap()
+            .success(),
+        "make clean failed"
+    );
+
     for (fixture, exit_code) in FIXTURES {
         println!(">>> Testing: {}", fixture);
 
