@@ -160,8 +160,8 @@ where
 named!(int(&str) -> Literal, map!(flat_map!(digit1, parse_to!(u64)), Literal::Int));
 
 named!(bool_(&str) -> Literal, alt!(
-    tag!("true") => { |_| Literal::Bool(true) } |
-    tag!("false") => { |_| Literal::Bool(false) }
+    complete!(tag!("true")) => { |_| Literal::Bool(true) } |
+    complete!(tag!("false")) => { |_| Literal::Bool(false) }
 ));
 
 fn string_internal(i: &str) -> nom::IResult<&str, Cow<'_, str>, nom::error::Error<&str>> {
@@ -172,7 +172,7 @@ fn string_internal(i: &str) -> nom::IResult<&str, Cow<'_, str>, nom::error::Erro
 }
 
 named!(string(&str) -> Literal, preceded!(
-    char!('"'),
+    complete!(char!('"')),
     map!(
         string_internal,
         |s| Literal::String(s)

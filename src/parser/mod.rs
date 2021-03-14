@@ -1,6 +1,6 @@
 use nom::character::complete::{multispace0, multispace1};
 use nom::error::{ErrorKind, ParseError};
-use nom::{alt, char, complete, do_parse, many0, named, separated_list0, tag};
+use nom::{alt, char, complete, do_parse, many0, named, separated_list0, tag, terminated};
 
 #[macro_use]
 mod macros;
@@ -81,7 +81,7 @@ named!(pub decl(&str) -> Decl, alt!(
     fun_decl
 ));
 
-named!(pub toplevel(&str) -> Vec<Decl>, many0!(decl));
+named!(pub toplevel(&str) -> Vec<Decl>, terminated!(many0!(decl), multispace0));
 
 #[cfg(test)]
 mod tests {
@@ -112,6 +112,11 @@ mod tests {
             "fn id x = x
              fn plus x y = x + y
              fn main = plus (id 2) 7"
+        );
+        assert_eq!(res.len(), 3);
+        let res = test_parse!(
+            toplevel,
+            "fn id x = x\nfn plus x y = x + y\nfn main = plus (id 2) 7\n"
         );
         assert_eq!(res.len(), 3);
     }
