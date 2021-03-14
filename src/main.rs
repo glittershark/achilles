@@ -8,6 +8,7 @@ pub mod compiler;
 pub mod interpreter;
 #[macro_use]
 pub mod parser;
+pub mod tc;
 
 pub use common::{Error, Result};
 
@@ -21,6 +22,7 @@ struct Opts {
 enum Command {
     Eval(commands::Eval),
     Compile(commands::Compile),
+    Check(commands::Check),
 }
 
 fn main() -> anyhow::Result<()> {
@@ -28,5 +30,6 @@ fn main() -> anyhow::Result<()> {
     match opts.subcommand {
         Command::Eval(eval) => Ok(eval.run()?),
         Command::Compile(compile) => Ok(compile.run()?),
+        Command::Check(check) => Ok(check.run()?),
     }
 }

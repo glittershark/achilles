@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[macro_use]
 macro_rules! test_parse {
     ($parser: ident, $src: expr) => {{

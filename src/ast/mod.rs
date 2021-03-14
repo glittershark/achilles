@@ -1,3 +1,5 @@
+pub(crate) mod hir;
+
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::{self, Display, Formatter};
@@ -107,6 +109,7 @@ pub enum UnaryOperator {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Literal {
     Int(u64),
+    Bool(bool),
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]

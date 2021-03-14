@@ -9,6 +9,7 @@ dependencies = [
  "derive_more",
  "inkwell",
  "itertools",
+ "lazy_static",
  "llvm-sys",
  "nom",
  "nom-trace",

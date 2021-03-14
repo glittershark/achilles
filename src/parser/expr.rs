@@ -156,7 +156,14 @@ where
 
 named!(int(&str) -> Literal, map!(flat_map!(digit1, parse_to!(u64)), Literal::Int));
 
-named!(literal(&str) -> Expr, map!(alt!(int), Expr::Literal));
+named!(bool_(&str) -> Literal, alt!(
+    tag!("true") => { |_| Literal::Bool(true) } |
+    tag!("false") => { |_| Literal::Bool(false) }
+));
+
+named!(literal(&str) -> Literal, alt!(int | bool_));
+
+named!(literal_expr(&str) -> Expr, map!(literal, Expr::Literal));
 
 named!(binding(&str) -> Binding, do_parse!(
     multispace0
@@ -262,7 +269,7 @@ named!(fun_expr(&str) -> Expr, do_parse!(
 
 named!(arg(&str) -> Expr, alt!(
     ident_expr |
-    literal |
+    literal_expr |
     paren_expr
 ));
 
@@ -280,7 +287,7 @@ named!(simple_expr_unascripted(&str) -> Expr, alt!(
     let_ |
     if_ |
     fun_expr |
-    literal |
+    literal_expr |
     ident_expr
 ));
 
@@ -397,6 +404,18 @@ pub(crate) mod tests {
                 }
             )
         }
+    }
+
+    #[test]
+    fn bools() {
+        assert_eq!(
+            test_parse!(expr, "true"),
+            Expr::Literal(Literal::Bool(true))
+        );
+        assert_eq!(
+            test_parse!(expr, "false"),
+            Expr::Literal(Literal::Bool(false))
+        );
     }
 
     #[test]

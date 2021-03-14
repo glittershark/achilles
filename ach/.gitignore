@@ -1,2 +1,5 @@
 *.ll
 *.o
+
+functions
+simple

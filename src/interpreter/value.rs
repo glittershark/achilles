@@ -6,13 +6,14 @@ use std::rc::Rc;
 use derive_more::{Deref, From, TryInto};
 
 use super::{Error, Result};
-use crate::ast::{Expr, FunctionType, Ident, Type};
+use crate::ast::hir::Expr;
+use crate::ast::{FunctionType, Ident, Type};
 
 #[derive(Debug, Clone)]
 pub struct Function<'a> {
     pub type_: FunctionType,
     pub args: Vec<Ident<'a>>,
-    pub body: Expr<'a>,
+    pub body: Expr<'a, Type>,
 }
 
 #[derive(From, TryInto)]

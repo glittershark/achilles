@@ -14,7 +14,10 @@ pub use type_::type_;
 pub type Error = nom::Err<nom::error::Error<String>>;
 
 pub(crate) fn is_reserved(s: &str) -> bool {
-    matches!(s, "if" | "then" | "else" | "let" | "in" | "fn")
+    matches!(
+        s,
+        "if" | "then" | "else" | "let" | "in" | "fn" | "int" | "float" | "bool" | "true" | "false"
+    )
 }
 
 pub(crate) fn ident<'a, E>(i: &'a str) -> nom::IResult<&'a str, Ident, E>

@@ -1,19 +1,25 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::mem;
-
-use crate::ast::Ident;
 
 /// A lexical environment
 #[derive(Debug, PartialEq, Eq)]
-pub struct Env<'ast, V>(Vec<HashMap<&'ast Ident<'ast>, V>>);
+pub struct Env<K: Eq + Hash, V>(Vec<HashMap<K, V>>);
 
-impl<'ast, V> Default for Env<'ast, V> {
+impl<K, V> Default for Env<K, V>
+where
+    K: Eq + Hash,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'ast, V> Env<'ast, V> {
+impl<K, V> Env<K, V>
+where
+    K: Eq + Hash,
+{
     pub fn new() -> Self {
         Self(vec![Default::default()])
     }
@@ -34,11 +40,15 @@ impl<'ast, V> Env<'ast, V> {
         *self = saved;
     }
 
-    pub fn set(&mut self, k: &'ast Ident<'ast>, v: V) {
+    pub fn set(&mut self, k: K, v: V) {
         self.0.last_mut().unwrap().insert(k, v);
     }
 
-    pub fn resolve<'a>(&'a self, k: &'ast Ident<'ast>) -> Option<&'a V> {
+    pub fn resolve<'a, Q>(&'a self, k: &Q) -> Option<&'a V>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
         for ctx in self.0.iter().rev() {
             if let Some(res) = ctx.get(k) {
                 return Some(res);

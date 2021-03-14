@@ -2,7 +2,7 @@ use std::{io, result};
 
 use thiserror::Error;
 
-use crate::{codegen, interpreter, parser};
+use crate::{codegen, interpreter, parser, tc};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -18,6 +18,9 @@ pub enum Error {
     #[error("Compile error: {0}")]
     CodegenError(#[from] codegen::Error),
 
+    #[error("Type error: {0}")]
+    TypeError(#[from] tc::Error),
+
     #[error("{0}")]
     Message(String),
 }
@@ -25,6 +28,12 @@ pub enum Error {
 impl From<String> for Error {
     fn from(s: String) -> Self {
         Self::Message(s)
+    }
+}
+
+impl<'a> From<&'a str> for Error {
+    fn from(s: &'a str) -> Self {
+        Self::Message(s.to_owned())
     }
 }
 

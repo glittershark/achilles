@@ -4,10 +4,11 @@ use inkwell::execution_engine::JitFunction;
 use inkwell::OptimizationLevel;
 pub use llvm::*;
 
-use crate::ast::Expr;
+use crate::ast::hir::Expr;
+use crate::ast::Type;
 use crate::common::Result;
 
-pub fn jit_eval<T>(expr: &Expr) -> Result<T> {
+pub fn jit_eval<T>(expr: &Expr<Type>) -> Result<T> {
     let context = Context::create();
     let mut codegen = Codegen::new(&context, "eval");
     let execution_engine = codegen
