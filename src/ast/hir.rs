@@ -26,7 +26,7 @@ impl<'a, T> Binding<'a, T> {
 pub enum Expr<'a, T> {
     Ident(Ident<'a>, T),
 
-    Literal(Literal, T),
+    Literal(Literal<'a>, T),
 
     UnaryOp {
         op: UnaryOperator,
@@ -158,7 +158,7 @@ impl<'a, T> Expr<'a, T> {
     {
         match self {
             Expr::Ident(id, t) => Expr::Ident(id.to_owned(), t.clone()),
-            Expr::Literal(lit, t) => Expr::Literal(lit.clone(), t.clone()),
+            Expr::Literal(lit, t) => Expr::Literal(lit.to_owned(), t.clone()),
             Expr::UnaryOp { op, rhs, type_ } => Expr::UnaryOp {
                 op: *op,
                 rhs: Box::new((**rhs).to_owned()),

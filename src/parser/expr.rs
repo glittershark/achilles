@@ -1,11 +1,14 @@
+use std::borrow::Cow;
+
+use nom::alt;
 use nom::character::complete::{digit1, multispace0, multispace1};
 use nom::{
-    alt, call, char, complete, delimited, do_parse, flat_map, many0, map, named, opt, parse_to,
+    call, char, complete, delimited, do_parse, flat_map, many0, map, named, opt, parse_to,
     preceded, separated_list0, separated_list1, tag, tuple,
 };
 use pratt::{Affix, Associativity, PrattParser, Precedence};
 
-use crate::ast::{BinaryOperator, Binding, Expr, Fun, Ident, Literal, UnaryOperator};
+use crate::ast::{BinaryOperator, Binding, Expr, Fun, Literal, UnaryOperator};
 use crate::parser::{ident, type_};
 
 #[derive(Debug)]
@@ -161,7 +164,22 @@ named!(bool_(&str) -> Literal, alt!(
     tag!("false") => { |_| Literal::Bool(false) }
 ));
 
-named!(literal(&str) -> Literal, alt!(int | bool_));
+fn string_internal(i: &str) -> nom::IResult<&str, Cow<'_, str>, nom::error::Error<&str>> {
+    let (s, rem) = i
+        .split_once('"')
+        .ok_or_else(|| nom::Err::Error(nom::error::Error::new(i, nom::error::ErrorKind::Tag)))?;
+    Ok((rem, Cow::Borrowed(s)))
+}
+
+named!(string(&str) -> Literal, preceded!(
+    char!('"'),
+    map!(
+        string_internal,
+        |s| Literal::String(s)
+    )
+));
+
+named!(literal(&str) -> Literal, alt!(int | bool_ | string));
 
 named!(literal_expr(&str) -> Expr, map!(literal, Expr::Literal));
 
@@ -308,7 +326,7 @@ named!(pub expr(&str) -> Expr, alt!(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::ast::Type;
+    use crate::ast::{Ident, Type};
     use std::convert::TryFrom;
     use BinaryOperator::*;
     use Expr::{BinaryOp, If, Let, UnaryOp};
@@ -416,6 +434,14 @@ pub(crate) mod tests {
             test_parse!(expr, "false"),
             Expr::Literal(Literal::Bool(false))
         );
+    }
+
+    #[test]
+    fn simple_string_lit() {
+        assert_eq!(
+            test_parse!(expr, "\"foobar\""),
+            Expr::Literal(Literal::String(Cow::Borrowed("foobar")))
+        )
     }
 
     #[test]

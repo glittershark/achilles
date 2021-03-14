@@ -29,6 +29,7 @@ impl<'a> Interpreter<'a> {
             Expr::Ident(id, _) => self.resolve(id),
             Expr::Literal(Literal::Int(i), _) => Ok((*i).into()),
             Expr::Literal(Literal::Bool(b), _) => Ok((*b).into()),
+            Expr::Literal(Literal::String(s), _) => Ok(s.clone().into()),
             Expr::UnaryOp { op, rhs, .. } => {
                 let rhs = self.eval(rhs)?;
                 match op {

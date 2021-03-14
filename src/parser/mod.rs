@@ -16,7 +16,17 @@ pub type Error = nom::Err<nom::error::Error<String>>;
 pub(crate) fn is_reserved(s: &str) -> bool {
     matches!(
         s,
-        "if" | "then" | "else" | "let" | "in" | "fn" | "int" | "float" | "bool" | "true" | "false"
+        "if" | "then"
+            | "else"
+            | "let"
+            | "in"
+            | "fn"
+            | "int"
+            | "float"
+            | "bool"
+            | "true"
+            | "false"
+            | "cstring"
     )
 }
 

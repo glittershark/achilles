@@ -49,6 +49,7 @@ pub enum PrimType {
     Int,
     Float,
     Bool,
+    CString,
 }
 
 impl From<PrimType> for ast::Type {
@@ -57,6 +58,7 @@ impl From<PrimType> for ast::Type {
             PrimType::Int => ast::Type::Int,
             PrimType::Float => ast::Type::Float,
             PrimType::Bool => ast::Type::Bool,
+            PrimType::CString => ast::Type::CString,
         }
     }
 }
@@ -67,6 +69,7 @@ impl Display for PrimType {
             PrimType::Int => f.write_str("int"),
             PrimType::Float => f.write_str("float"),
             PrimType::Bool => f.write_str("bool"),
+            PrimType::CString => f.write_str("cstring"),
         }
     }
 }
@@ -125,6 +128,7 @@ impl TryFrom<Type> for ast::Type {
 const INT: Type = Type::Prim(PrimType::Int);
 const FLOAT: Type = Type::Prim(PrimType::Float);
 const BOOL: Type = Type::Prim(PrimType::Bool);
+const CSTRING: Type = Type::Prim(PrimType::CString);
 
 impl Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -144,6 +148,7 @@ impl From<ast::Type> for Type {
             ast::Type::Int => INT,
             ast::Type::Float => FLOAT,
             ast::Type::Bool => BOOL,
+            ast::Type::CString => CSTRING,
             ast::Type::Function(ast::FunctionType { args, ret }) => Type::Fun {
                 args: args.into_iter().map(Self::from).collect(),
                 ret: Box::new(Self::from(*ret)),
@@ -181,8 +186,9 @@ impl<'ast> Typechecker<'ast> {
                 let type_ = match lit {
                     Literal::Int(_) => Type::Prim(PrimType::Int),
                     Literal::Bool(_) => Type::Prim(PrimType::Bool),
+                    Literal::String(_) => Type::Prim(PrimType::CString),
                 };
-                Ok(hir::Expr::Literal(lit, type_))
+                Ok(hir::Expr::Literal(lit.to_owned(), type_))
             }
             ast::Expr::UnaryOp { op, rhs } => todo!(),
             ast::Expr::BinaryOp { lhs, op, rhs } => {

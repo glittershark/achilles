@@ -1,3 +1,5 @@
+#![feature(str_split_once)]
+
 use clap::Clap;
 
 pub mod ast;

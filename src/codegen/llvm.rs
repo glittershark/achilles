@@ -92,6 +92,7 @@ impl<'ctx, 'ast> Codegen<'ctx, 'ast> {
                     Literal::Bool(b) => Ok(AnyValueEnum::IntValue(
                         ty.const_int(if *b { 1 } else { 0 }, false),
                     )),
+                    Literal::String(_) => todo!(),
                 }
             }
             Expr::UnaryOp { op, rhs, .. } => {

@@ -1,7 +1,9 @@
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt::{self, Display};
 use std::ops::{Add, Div, Mul, Neg, Sub};
 use std::rc::Rc;
+use std::result;
 
 use derive_more::{Deref, From, TryInto};
 
@@ -22,7 +24,19 @@ pub enum Val<'a> {
     Int(i64),
     Float(f64),
     Bool(bool),
+    String(Cow<'a, str>),
     Function(Function<'a>),
+}
+
+impl<'a> TryFrom<Val<'a>> for String {
+    type Error = ();
+
+    fn try_from(value: Val<'a>) -> result::Result<Self, Self::Error> {
+        match value {
+            Val::String(s) => Ok(s.into_owned()),
+            _ => Err(()),
+        }
+    }
 }
 
 impl<'a> fmt::Debug for Val<'a> {
@@ -31,6 +45,7 @@ impl<'a> fmt::Debug for Val<'a> {
             Val::Int(x) => f.debug_tuple("Int").field(x).finish(),
             Val::Float(x) => f.debug_tuple("Float").field(x).finish(),
             Val::Bool(x) => f.debug_tuple("Bool").field(x).finish(),
+            Val::String(s) => f.debug_tuple("String").field(s).finish(),
             Val::Function(Function { type_, .. }) => {
                 f.debug_struct("Function").field("type_", type_).finish()
             }
@@ -62,6 +77,7 @@ impl<'a> Display for Val<'a> {
             Val::Int(x) => x.fmt(f),
             Val::Float(x) => x.fmt(f),
             Val::Bool(x) => x.fmt(f),
+            Val::String(s) => write!(f, "{:?}", s),
             Val::Function(Function { type_, .. }) => write!(f, "<{}>", type_),
         }
     }
@@ -73,6 +89,7 @@ impl<'a> Val<'a> {
             Val::Int(_) => Type::Int,
             Val::Float(_) => Type::Float,
             Val::Bool(_) => Type::Bool,
+            Val::String(_) => Type::CString,
             Val::Function(Function { type_, .. }) => Type::Function(type_.clone()),
         }
     }
@@ -176,5 +193,11 @@ impl TypeOf for bool {
 impl TypeOf for f64 {
     fn type_of() -> Type {
         Type::Float
+    }
+}
+
+impl TypeOf for String {
+    fn type_of() -> Type {
+        Type::CString
     }
 }

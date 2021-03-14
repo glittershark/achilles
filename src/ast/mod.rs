@@ -107,9 +107,20 @@ pub enum UnaryOperator {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum Literal {
+pub enum Literal<'a> {
     Int(u64),
     Bool(bool),
+    String(Cow<'a, str>),
+}
+
+impl<'a> Literal<'a> {
+    pub fn to_owned(&self) -> Literal<'static> {
+        match self {
+            Literal::Int(i) => Literal::Int(*i),
+            Literal::Bool(b) => Literal::Bool(*b),
+            Literal::String(s) => Literal::String(Cow::Owned(s.clone().into_owned())),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -133,7 +144,7 @@ impl<'a> Binding<'a> {
 pub enum Expr<'a> {
     Ident(Ident<'a>),
 
-    Literal(Literal),
+    Literal(Literal<'a>),
 
     UnaryOp {
         op: UnaryOperator,
@@ -174,7 +185,7 @@ impl<'a> Expr<'a> {
     pub fn to_owned(&self) -> Expr<'static> {
         match self {
             Expr::Ident(ref id) => Expr::Ident(id.to_owned()),
-            Expr::Literal(ref lit) => Expr::Literal(lit.clone()),
+            Expr::Literal(ref lit) => Expr::Literal(lit.to_owned()),
             Expr::UnaryOp { op, rhs } => Expr::UnaryOp {
                 op: *op,
                 rhs: Box::new((**rhs).to_owned()),
@@ -247,6 +258,7 @@ pub enum Type {
     Int,
     Float,
     Bool,
+    CString,
     Function(FunctionType),
 }
 
@@ -256,6 +268,7 @@ impl Display for Type {
             Type::Int => f.write_str("int"),
             Type::Float => f.write_str("float"),
             Type::Bool => f.write_str("bool"),
+            Type::CString => f.write_str("cstring"),
             Type::Function(ft) => ft.fmt(f),
         }
     }

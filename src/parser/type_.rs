@@ -27,6 +27,7 @@ named!(pub type_(&str) -> Type, alt!(
     tag!("int") => { |_| Type::Int } |
     tag!("float") => { |_| Type::Float } |
     tag!("bool") => { |_| Type::Bool } |
+    tag!("cstring") => { |_| Type::CString } |
     function_type |
     delimited!(
         tuple!(tag!("("), multispace0),
@@ -44,6 +45,7 @@ mod tests {
         assert_eq!(test_parse!(type_, "int"), Type::Int);
         assert_eq!(test_parse!(type_, "float"), Type::Float);
         assert_eq!(test_parse!(type_, "bool"), Type::Bool);
+        assert_eq!(test_parse!(type_, "cstring"), Type::CString);
     }
 
     #[test]
